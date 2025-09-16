@@ -7,6 +7,8 @@ import { jokerHandler } from "./tools/joker.js";
 import { calculatorHandler } from "./tools/calculator.js";
 import { studentGradesHandler } from "./tools/studentGrades.js";
 import { llmHandler } from "./tools/llm.js";
+import { currencyExchangeHandler } from "./tools/currencyExchange.js";
+import { currencyExchangeLLMHandler } from "./tools/currencyExchangeLLM.js";
 
 export class SimpleMcpServer {
   constructor() {
@@ -50,6 +52,22 @@ export class SimpleMcpServer {
       title: "LLM 大模型调用",
       description: "调用各种大语言模型进行对话、文本生成、翻译、摘要和代码生成",
       handler: llmHandler,
+    });
+
+    // 注册货币兑换工具
+    this.tools.set("currency_exchange", {
+      name: "currency_exchange",
+      title: "货币兑换",
+      description: "计算不同货币之间的兑换金额，支持多种主流货币",
+      handler: currencyExchangeHandler,
+    });
+
+    // 注册货币兑换LLM工具
+    this.tools.set("currency_exchange_llm", {
+      name: "currency_exchange_llm",
+      title: "货币兑换LLM",
+      description: "使用LLM处理用户输入的货币兑换请求，读取CSV文件并生成结果",
+      handler: currencyExchangeLLMHandler,
     });
   }
 

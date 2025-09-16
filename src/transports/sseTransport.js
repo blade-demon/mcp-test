@@ -12,6 +12,7 @@ export class SSETransport extends EventEmitter {
     this.isConnected = false;
     this.messageBuffer = [];
     this.messageHandlers = new Map();
+    this.heartbeatTimer = null;
 
     this.setupSSE();
   }
@@ -34,6 +35,17 @@ export class SSETransport extends EventEmitter {
 
     this.isConnected = true;
     this.emit("connect");
+
+    // 心跳保持，防止中间件闲置断开（每15秒）
+    this.heartbeatTimer = setInterval(() => {
+      try {
+        // 注释行作为SSE心跳
+        this.res.write(":heartbeat\n\n");
+      } catch (_) {
+        // 写入失败则关闭
+        this.close();
+      }
+    }, 15000);
   }
 
   /**
@@ -96,6 +108,10 @@ export class SSETransport extends EventEmitter {
   close() {
     if (this.isConnected) {
       this.isConnected = false;
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = null;
+      }
       this.sendSSEMessage("disconnected", {
         message: "MCP Server disconnected",
       });
@@ -119,9 +135,7 @@ export class SSETransport extends EventEmitter {
     return Promise.resolve();
   }
 
-  async close() {
-    this.close();
-  }
+  // 移除重复的异步 close，避免递归
 
   /**
    * 发送消息到MCP服务器

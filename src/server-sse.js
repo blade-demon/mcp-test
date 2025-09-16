@@ -3,19 +3,26 @@ import express from "express";
 import cors from "cors";
 import { SSETransport } from "./transports/sseTransport.js";
 import { SimpleMcpServer } from "./mcpServer.js";
+import { SERVER_INFO, DEFAULT_PORT, STATIC_ROUTES } from "./config/config.js";
+import { sessionStore } from "./utils/sessionStore.js";
 
 // 加载环境变量
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || DEFAULT_PORT;
 
 // 中间件
 app.use(cors());
 app.use(express.json());
 
+// 静态文件服务
+for (const route of STATIC_ROUTES) {
+  app.use(route.mountPath, express.static(route.dir));
+}
+
 // 存储活跃的MCP服务器实例
-const activeServers = new Map();
+const activeServers = sessionStore;
 
 /**
  * 创建MCP服务器实例
@@ -80,11 +87,15 @@ async function handleMcpMessage(server, message) {
 async function handleToolCall(server, message) {
   const { name, arguments: args } = message.params;
 
+  console.log(`🔧 工具调用: ${name}`);
+  console.log(`   📊 参数: ${JSON.stringify(args)}`);
+
   // 获取工具处理器
   const tools = server.getTools();
   const tool = tools.find((t) => t.name === name);
 
   if (!tool) {
+    console.log(`❌ 工具未找到: ${name}`);
     return {
       jsonrpc: "2.0",
       id: message.id,
@@ -97,12 +108,14 @@ async function handleToolCall(server, message) {
 
   try {
     const result = await tool.handler(args);
+    console.log(`✅ 工具执行成功: ${name}`);
     return {
       jsonrpc: "2.0",
       id: message.id,
       result: result,
     };
   } catch (error) {
+    console.error(`❌ 工具执行失败: ${name} - ${error.message}`);
     return {
       jsonrpc: "2.0",
       id: message.id,
@@ -161,8 +174,17 @@ async function handleResourceRead(server, message) {
  */
 app.get("/sse", async (req, res) => {
   const sessionId = req.query.sessionId || `session_${Date.now()}`;
+  const clientIP =
+    req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+  const userAgent = req.get("User-Agent") || "Unknown";
 
-  console.log(`New SSE connection: ${sessionId}`);
+  console.log(`🔗 新的SSE连接: ${sessionId}`);
+  console.log(`   📍 客户端IP: ${clientIP}`);
+  console.log(
+    `   🖥️  User-Agent: ${userAgent.substring(0, 100)}${
+      userAgent.length > 100 ? "..." : ""
+    }`
+  );
 
   // 创建SSE传输层
   const transport = new SSETransport(res, req);
@@ -182,20 +204,20 @@ app.get("/sse", async (req, res) => {
 
     // 初始化MCP服务器
     await server.start();
-    console.log(`MCP server started for session: ${sessionId}`);
+    console.log(`✅ MCP服务器启动成功: ${sessionId}`);
 
     // 发送服务器启动成功状态
     transport.sendServerStatus("started", "MCP服务器已成功启动", {
       sessionId,
       serverInfo: {
-        name: "demo-server",
-        version: "1.0.0",
+        name: SERVER_INFO.name,
+        version: SERVER_INFO.version,
         tools: server.getTools().map((t) => t.name),
         resources: server.getResources().map((r) => r.name),
       },
     });
   } catch (error) {
-    console.error(`Failed to start MCP server: ${error.message}`);
+    console.error(`❌ MCP服务器启动失败: ${sessionId} - ${error.message}`);
 
     // 发送服务器启动失败状态
     transport.sendServerStatus("error", `MCP服务器启动失败: ${error.message}`, {
@@ -209,14 +231,16 @@ app.get("/sse", async (req, res) => {
 
   // 处理客户端断开连接
   req.on("close", () => {
-    console.log(`SSE connection closed: ${sessionId}`);
+    console.log(`🔌 客户端断开连接: ${sessionId}`);
     activeServers.delete(sessionId);
+    console.log(`📊 当前活跃连接数: ${activeServers.size()}`);
   });
 
   // 处理传输层错误
   transport.on("error", (error) => {
-    console.error(`Transport error: ${error.message}`);
+    console.error(`❌ 传输层错误: ${sessionId} - ${error.message}`);
     activeServers.delete(sessionId);
+    console.log(`📊 当前活跃连接数: ${activeServers.size()}`);
   });
 });
 
@@ -226,10 +250,17 @@ app.get("/sse", async (req, res) => {
 app.post("/mcp/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
   const message = req.body;
+  const clientIP =
+    req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+
+  console.log(`📨 收到MCP消息: ${sessionId} (${clientIP})`);
+  console.log(`   📝 方法: ${message.method || "unknown"}`);
+  console.log(`   🆔 消息ID: ${message.id || "none"}`);
 
   const serverInstance = activeServers.get(sessionId);
 
   if (!serverInstance) {
+    console.log(`❌ Session未找到: ${sessionId}`);
     return res.status(404).json({ error: "Session not found" });
   }
 
@@ -240,11 +271,12 @@ app.post("/mcp/:sessionId", async (req, res) => {
     // 通过SSE发送响应
     if (response) {
       serverInstance.transport.handleMcpMessage(response);
+      console.log(`✅ MCP消息处理成功: ${sessionId} - ${message.method}`);
     }
 
     res.json({ status: "message processed" });
   } catch (error) {
-    console.error(`Failed to handle message: ${error.message}`);
+    console.error(`❌ MCP消息处理失败: ${sessionId} - ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
@@ -255,9 +287,18 @@ app.post("/mcp/:sessionId", async (req, res) => {
 app.get("/status", (req, res) => {
   res.json({
     status: "running",
-    activeSessions: activeServers.size,
-    version: "1.0.0",
-    tools: ["joker", "calculator", "student_grades"],
+    activeSessions:
+      typeof activeServers.size === "function"
+        ? activeServers.size()
+        : activeServers.size,
+    version: SERVER_INFO.version,
+    tools: [
+      "joker",
+      "calculator",
+      "student_grades",
+      "currency_exchange",
+      "currency_exchange_llm",
+    ],
     resources: ["greeting"],
   });
 });
@@ -286,11 +327,12 @@ app.use((error, req, res, next) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`🚀 MCP Server with SSE running on port ${PORT}`);
+  console.log(`\n🚀 MCP Server with SSE running on port ${PORT}`);
   console.log(`📡 SSE endpoint: http://localhost:${PORT}/sse`);
   console.log(`📊 Status endpoint: http://localhost:${PORT}/status`);
   console.log(`🔧 Tools endpoint: http://localhost:${PORT}/tools`);
   console.log(`📚 Resources endpoint: http://localhost:${PORT}/resources`);
+  console.log(`\n💡 等待客户端连接...\n`);
 });
 
 // 优雅关闭
@@ -298,8 +340,13 @@ process.on("SIGINT", () => {
   console.log("\n🛑 Shutting down server...");
 
   // 关闭所有活跃连接
-  for (const [sessionId, { transport }] of activeServers) {
-    transport.close();
+  const iterator =
+    typeof activeServers.entries === "function"
+      ? activeServers.entries()
+      : activeServers[Symbol.iterator]();
+  for (const [sessionId, value] of iterator) {
+    const transport = value.transport;
+    if (transport) transport.close();
   }
 
   process.exit(0);

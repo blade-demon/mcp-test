@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>货币兑换 MCP Client</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #555;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 16px;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+        margin-bottom: 10px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+      }
+      .result {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 5px;
+        font-size: 16px;
+      }
+      .success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+      .info {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+      }
+      .status {
+        margin-bottom: 20px;
+        padding: 10px;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .connecting {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .log {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 5px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 14px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>💱 货币兑换 MCP Client</h1>
+
+      <div id="status" class="status disconnected">🔴 未连接到服务器</div>
+
+      <div class="form-group">
+        <label for="serverUrl">服务器地址:</label>
+        <input
+          type="text"
+          id="serverUrl"
+          value="http://localhost:3000"
+          placeholder="http://localhost:3000"
+        />
+      </div>
+
+      <button id="connectBtn" onclick="connect()">连接服务器</button>
+      <button id="disconnectBtn" onclick="disconnect()">断开连接</button>
+      <button id="statusBtn" onclick="getStatus()">获取状态</button>
+
+      <hr style="margin: 30px 0" />
+
+      <h2>货币兑换</h2>
+
+      <div class="form-group">
+        <label for="amount">金额:</label>
+        <input
+          type="number"
+          id="amount"
+          placeholder="输入金额"
+          step="0.01"
+          min="0"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="fromCurrency">源货币:</label>
+        <select id="fromCurrency">
+          <option value="USD">USD - 美元</option>
+          <option value="EUR">EUR - 欧元</option>
+          <option value="GBP">GBP - 英镑</option>
+          <option value="JPY">JPY - 日元</option>
+          <option value="CNY">CNY - 人民币</option>
+          <option value="CAD">CAD - 加拿大元</option>
+          <option value="AUD">AUD - 澳大利亚元</option>
+          <option value="CHF">CHF - 瑞士法郎</option>
+          <option value="HKD">HKD - 港元</option>
+          <option value="NZD">NZD - 新西兰元</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="toCurrency">目标货币:</label>
+        <select id="toCurrency">
+          <option value="USD">USD - 美元</option>
+          <option value="EUR">EUR - 欧元</option>
+          <option value="GBP">GBP - 英镑</option>
+          <option value="JPY">JPY - 日元</option>
+          <option value="CNY">CNY - 人民币</option>
+          <option value="CAD">CAD - 加拿大元</option>
+          <option value="AUD">AUD - 澳大利亚元</option>
+          <option value="CHF">CHF - 瑞士法郎</option>
+          <option value="HKD">HKD - 港元</option>
+          <option value="NZD">NZD - 新西兰元</option>
+        </select>
+      </div>
+
+      <button id="exchangeBtn" onclick="exchangeCurrency()">兑换货币</button>
+      <button id="llmBtn" onclick="runLLM()">运行LLM处理</button>
+
+      <div id="result"></div>
+
+      <div class="log" id="log">
+        <div>📝 操作日志:</div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { CurrencyExchangeClient } from "../js/CurrencyExchangeClient.js";
+
+      let client = null;
+      let isConnected = false;
+
+      function log(message) {
+        const logDiv = document.getElementById("log");
+        const timestamp = new Date().toLocaleTimeString();
+        logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function setControlsEnabled(enabled) {
+        const amount = document.getElementById("amount");
+        const fromCurrency = document.getElementById("fromCurrency");
+        const toCurrency = document.getElementById("toCurrency");
+        const exchangeBtn = document.getElementById("exchangeBtn");
+        const llmBtn = document.getElementById("llmBtn");
+        // statusBtn 的状态由 updateStatus 函数单独管理
+
+        amount.disabled = !enabled;
+        fromCurrency.disabled = !enabled;
+        toCurrency.disabled = !enabled;
+        exchangeBtn.disabled = !enabled;
+        llmBtn.disabled = !enabled;
+      }
+
+      function updateStatus(connected, connecting = false) {
+        isConnected = connected;
+        const statusDiv = document.getElementById("status");
+        const connectBtn = document.getElementById("connectBtn");
+        const disconnectBtn = document.getElementById("disconnectBtn");
+        const statusBtn = document.getElementById("statusBtn");
+
+        if (connecting) {
+          statusDiv.className = "status connecting";
+          statusDiv.innerHTML = "🟡 正在连接服务器...";
+          setControlsEnabled(false);
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = true;
+          statusBtn.disabled = true;
+        } else if (connected) {
+          statusDiv.className = "status connected";
+          statusDiv.innerHTML = "🟢 已连接到服务器";
+          setControlsEnabled(true);
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          statusBtn.disabled = false;
+        } else {
+          statusDiv.className = "status disconnected";
+          statusDiv.innerHTML = "🔴 未连接到服务器";
+          setControlsEnabled(false);
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          statusBtn.disabled = false;
+        }
+      }
+
+      function showResult(message, type = "info") {
+        const resultDiv = document.getElementById("result");
+        resultDiv.className = `result ${type}`;
+        resultDiv.innerHTML = message;
+      }
+
+      window.connect = async function () {
+        try {
+          const serverUrl = document.getElementById("serverUrl").value;
+          log(`🔗 正在连接到服务器: ${serverUrl}`);
+
+          client = new CurrencyExchangeClient(serverUrl);
+          // 显示连接中状态，这会自动禁用相关按钮
+          updateStatus(false, true);
+          await client.connect();
+          await client.initialize();
+
+          updateStatus(true);
+          log("✅ 连接成功！");
+          showResult("✅ 已成功连接到MCP服务器", "success");
+        } catch (error) {
+          log(`❌ 连接失败: ${error.message}`);
+          showResult(`❌ 连接失败: ${error.message}`, "error");
+          updateStatus(false); // 这会自动启用连接按钮
+        }
+      };
+
+      window.disconnect = function () {
+        if (client) {
+          client.disconnect();
+          client = null;
+        }
+        updateStatus(false);
+        log("🔌 已断开连接");
+        showResult("🔌 已断开与服务器的连接", "info");
+      };
+
+      window.getStatus = async function () {
+        if (!client) {
+          showResult("❌ 请先连接到服务器", "error");
+          return;
+        }
+
+        try {
+          const status = await client.getServerStatus();
+          log("📊 获取服务器状态成功");
+          showResult(
+            `📊 服务器状态: ${JSON.stringify(status, null, 2)}`,
+            "info"
+          );
+        } catch (error) {
+          log(`❌ 获取状态失败: ${error.message}`);
+          showResult(`❌ 获取状态失败: ${error.message}`, "error");
+        }
+      };
+
+      window.exchangeCurrency = async function () {
+        if (!client) {
+          showResult("❌ 请先连接到服务器", "error");
+          return;
+        }
+
+        const amount = parseFloat(document.getElementById("amount").value);
+        const fromCurrency = document.getElementById("fromCurrency").value;
+        const toCurrency = document.getElementById("toCurrency").value;
+
+        if (!amount || amount <= 0) {
+          showResult("❌ 请输入有效的金额", "error");
+          return;
+        }
+
+        try {
+          log(`💱 正在兑换: ${amount} ${fromCurrency} → ${toCurrency}`);
+          const result = await client.exchangeCurrency(
+            amount,
+            fromCurrency,
+            toCurrency
+          );
+
+          const resultText = result.content[0].text;
+          log(`✅ 兑换成功: ${resultText}`);
+          showResult(resultText, "success");
+        } catch (error) {
+          log(`❌ 兑换失败: ${error.message}`);
+          showResult(`❌ 兑换失败: ${error.message}`, "error");
+        }
+      };
+
+      window.runLLM = async function () {
+        if (!client) {
+          showResult("❌ 请先连接到服务器", "error");
+          return;
+        }
+
+        try {
+          log("🤖 正在运行LLM处理...");
+          const result = await client.sendMcpMessage({
+            method: "tools/call",
+            params: {
+              name: "currency_exchange_llm",
+              arguments: {},
+            },
+          });
+
+          if (result.error) {
+            throw new Error(result.error.message);
+          }
+
+          const resultText = result.result.content[0].text;
+          log("✅ LLM处理完成");
+          showResult(resultText, "success");
+        } catch (error) {
+          log(`❌ LLM处理失败: ${error.message}`);
+          showResult(`❌ LLM处理失败: ${error.message}`, "error");
+        }
+      };
+
+      // 页面加载时的初始化
+      log("🚀 货币兑换MCP Client已加载");
+      log('💡 请先点击"连接服务器"按钮连接到MCP服务器');
+      // 设置初始状态
+      updateStatus(false);
+    </script>
+  </body>
+</html>

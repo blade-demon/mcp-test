@@ -5,7 +5,6 @@
     "cors": "^2.8.5",
     "csv-parser": "^3.0.0",
     "dotenv": "^17.2.2",
-    "eventsource": "^2.0.2",
     "express": "^4.18.2",
     "node-fetch": "^3.3.2",
     "openai": "^4.20.1",
@@ -17,17 +16,20 @@
   },
   "name": "mcp-calculator",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "MCP Calculator with Currency Exchange",
+  "main": "src/server-sse.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "start:sse": "node src/server-sse.js",
-    "client": "node examples/client.js",
+    "start": "node src/server-sse.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
-  "keywords": [],
+  "keywords": [
+    "mcp",
+    "calculator",
+    "currency-exchange",
+    "sse"
+  ],
   "author": "",
   "license": "ISC",
   "engines": {

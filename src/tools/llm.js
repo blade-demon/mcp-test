@@ -43,202 +43,10 @@ class ConversationManager {
   getAllConversationIds() {
     return Array.from(this.conversations.keys());
   }
-
-  // 获取对话统计信息
-  getConversationStats(conversationId) {
-    const conversation = this.conversations.get(conversationId);
-    if (!conversation) return null;
-
-    return {
-      messageCount: conversation.length,
-      lastActivity: Math.max(...conversation.map((msg) => msg.timestamp)),
-      userMessages: conversation.filter((msg) => msg.role === "user").length,
-      assistantMessages: conversation.filter((msg) => msg.role === "assistant")
-        .length,
-    };
-  }
 }
 
 // 全局对话管理器实例
 const conversationManager = new ConversationManager();
-
-// 性能监控和成本统计管理器
-class PerformanceMonitor {
-  constructor() {
-    this.stats = {
-      totalRequests: 0,
-      totalTokens: 0,
-      totalCost: 0,
-      averageResponseTime: 0,
-      requestsByProvider: {},
-      requestsByModel: {},
-      errors: 0,
-      startTime: Date.now(),
-    };
-    this.requestHistory = [];
-    this.maxHistoryLength = 1000;
-  }
-
-  // 记录请求
-  recordRequest(provider, model, tokens, cost, responseTime, success = true) {
-    this.stats.totalRequests++;
-    this.stats.totalTokens += tokens;
-    this.stats.totalCost += cost;
-
-    if (!success) {
-      this.stats.errors++;
-    }
-
-    // 更新平均响应时间
-    this.stats.averageResponseTime =
-      (this.stats.averageResponseTime * (this.stats.totalRequests - 1) +
-        responseTime) /
-      this.stats.totalRequests;
-
-    // 按提供商统计
-    if (!this.stats.requestsByProvider[provider]) {
-      this.stats.requestsByProvider[provider] = {
-        requests: 0,
-        tokens: 0,
-        cost: 0,
-        errors: 0,
-      };
-    }
-    this.stats.requestsByProvider[provider].requests++;
-    this.stats.requestsByProvider[provider].tokens += tokens;
-    this.stats.requestsByProvider[provider].cost += cost;
-    if (!success) {
-      this.stats.requestsByProvider[provider].errors++;
-    }
-
-    // 按模型统计
-    if (!this.stats.requestsByModel[model]) {
-      this.stats.requestsByModel[model] = {
-        requests: 0,
-        tokens: 0,
-        cost: 0,
-        errors: 0,
-      };
-    }
-    this.stats.requestsByModel[model].requests++;
-    this.stats.requestsByModel[model].tokens += tokens;
-    this.stats.requestsByModel[model].cost += cost;
-    if (!success) {
-      this.stats.requestsByModel[model].errors++;
-    }
-
-    // 记录请求历史
-    this.requestHistory.push({
-      timestamp: Date.now(),
-      provider,
-      model,
-      tokens,
-      cost,
-      responseTime,
-      success,
-    });
-
-    // 限制历史记录长度
-    if (this.requestHistory.length > this.maxHistoryLength) {
-      this.requestHistory.splice(
-        0,
-        this.requestHistory.length - this.maxHistoryLength
-      );
-    }
-  }
-
-  // 获取统计信息
-  getStats() {
-    const uptime = Date.now() - this.stats.startTime;
-    return {
-      ...this.stats,
-      uptime,
-      requestsPerHour: (this.stats.totalRequests / (uptime / 3600000)).toFixed(
-        2
-      ),
-      averageTokensPerRequest:
-        this.stats.totalRequests > 0
-          ? (this.stats.totalTokens / this.stats.totalRequests).toFixed(2)
-          : 0,
-      successRate:
-        this.stats.totalRequests > 0
-          ? (
-              ((this.stats.totalRequests - this.stats.errors) /
-                this.stats.totalRequests) *
-              100
-            ).toFixed(2)
-          : 100,
-    };
-  }
-
-  // 获取请求历史
-  getRequestHistory(limit = 100) {
-    return this.requestHistory.slice(-limit);
-  }
-
-  // 重置统计
-  resetStats() {
-    this.stats = {
-      totalRequests: 0,
-      totalTokens: 0,
-      totalCost: 0,
-      averageResponseTime: 0,
-      requestsByProvider: {},
-      requestsByModel: {},
-      errors: 0,
-      startTime: Date.now(),
-    };
-    this.requestHistory = [];
-  }
-}
-
-// 全局性能监控实例
-const performanceMonitor = new PerformanceMonitor();
-
-// 模型定价信息（每1000个token的价格，单位：美元）
-const MODEL_PRICING = {
-  // OpenAI
-  "gpt-3.5-turbo": { input: 0.0015, output: 0.002 },
-  "gpt-4": { input: 0.03, output: 0.06 },
-  "gpt-4o": { input: 0.005, output: 0.015 },
-  "gpt-4o-mini": { input: 0.00015, output: 0.0006 },
-
-  // Anthropic
-  "claude-3-5-sonnet-20241022": { input: 0.003, output: 0.015 },
-  "claude-3-haiku-20240307": { input: 0.00025, output: 0.00125 },
-  "claude-3-opus-20240229": { input: 0.015, output: 0.075 },
-
-  // Google
-  "gemini-pro": { input: 0.0005, output: 0.0015 },
-  "gemini-pro-vision": { input: 0.0005, output: 0.0015 },
-  "gemini-2.0-pro": { input: 0.00125, output: 0.005 },
-  "gemini-1.5-pro": { input: 0.00125, output: 0.005 },
-  "gemini-1.5-flash": { input: 0.000075, output: 0.0003 },
-
-  // 阿里云
-  "qwen-turbo": { input: 0.0003, output: 0.0006 },
-  "qwen-plus": { input: 0.0008, output: 0.002 },
-  "qwen-max": { input: 0.002, output: 0.006 },
-  "qwen-vl-plus": { input: 0.002, output: 0.006 },
-
-  // 本地模型（免费）
-  "llama-2": { input: 0, output: 0 },
-  mistral: { input: 0, output: 0 },
-  qwen: { input: 0, output: 0 },
-  codellama: { input: 0, output: 0 },
-  "phi-3": { input: 0, output: 0 },
-};
-
-// 计算成本
-function calculateCost(model, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[model];
-  if (!pricing) return 0;
-
-  return (
-    (inputTokens / 1000) * pricing.input +
-    (outputTokens / 1000) * pricing.output
-  );
-}
 
 // 提示词模板管理器
 class PromptTemplateManager {
@@ -1009,20 +817,7 @@ export async function llmHandler(args) {
       success = false;
       throw error;
     } finally {
-      // 记录性能数据
-      const responseTime = Date.now() - startTime;
-      const inputTokens = prompt.length; // 简化的token计算
-      const outputTokens = response ? response.length : 0;
-      const cost = calculateCost(finalModel, inputTokens, outputTokens);
-
-      performanceMonitor.recordRequest(
-        finalProvider,
-        finalModel,
-        inputTokens + outputTokens,
-        cost,
-        responseTime,
-        success
-      );
+      // 请求处理完成
     }
 
     // 如果有对话ID，保存对话历史
@@ -1048,9 +843,6 @@ export async function llmHandler(args) {
         conversation_id: conversation_id,
         has_images: hasImages,
         stream_enabled: stream || false,
-        conversation_stats: conversation_id
-          ? conversationManager.getConversationStats(conversation_id)
-          : null,
       },
     };
   } catch (error) {
@@ -1106,22 +898,21 @@ export function getLLMToolInfo() {
       properties: {
         type: {
           type: "string",
-          enum: ["chat", "generate", "translate", "summary", "code", "vision"],
+          enum: [
+            "chat",
+            "generate",
+            "translate",
+            "summary",
+            "code",
+            "vision",
+            "template",
+          ],
           description:
-            "请求类型：chat(对话), generate(文本生成), translate(翻译), summary(摘要), code(代码生成), vision(图像理解)",
+            "请求类型：chat(对话), generate(文本生成), translate(翻译), summary(摘要), code(代码生成), vision(图像理解), template(模板使用)",
         },
         prompt: {
           type: "string",
           description: "用户输入的提示词",
-        },
-        model: {
-          type: "string",
-          description: "指定使用的模型（可选）",
-        },
-        provider: {
-          type: "string",
-          enum: ["openai", "anthropic", "google", "alibaba", "local"],
-          description: "模型提供商：openai, anthropic, google, alibaba, local",
         },
         language: {
           type: "string",
@@ -1155,6 +946,14 @@ export function getLLMToolInfo() {
         conversation_id: {
           type: "string",
           description: "对话ID（用于多轮对话）",
+        },
+        template_id: {
+          type: "string",
+          description: "提示词模板ID",
+        },
+        template_variables: {
+          type: "object",
+          description: "模板变量",
         },
       },
       required: ["type", "prompt"],
@@ -1199,30 +998,6 @@ export function getAllConversations() {
   }
 
   return conversations;
-}
-
-export function getConversationStats(conversationId) {
-  return conversationManager.getConversationStats(conversationId);
-}
-
-/**
- * 性能监控和成本统计函数
- */
-export function getPerformanceStats() {
-  return performanceMonitor.getStats();
-}
-
-export function getRequestHistory(limit = 100) {
-  return performanceMonitor.getRequestHistory(limit);
-}
-
-export function resetPerformanceStats() {
-  performanceMonitor.resetStats();
-  return { success: true, message: "性能统计已重置" };
-}
-
-export function getModelPricing() {
-  return MODEL_PRICING;
 }
 
 /**
