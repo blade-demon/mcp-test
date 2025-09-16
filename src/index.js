@@ -1,8 +1,12 @@
+import dotenv from "dotenv";
 import {
   McpServer,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+// 加载环境变量
+dotenv.config();
 
 // 导入工具配置和处理器
 import { jokerConfig, jokerHandler } from "./tools/joker.js";

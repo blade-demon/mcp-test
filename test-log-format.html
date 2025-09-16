@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>日志格式测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .log {
+        background-color: #343a40;
+        color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .log-entry {
+        margin-bottom: 4px;
+        padding: 2px 0;
+        border-bottom: 1px solid #495057;
+        word-wrap: break-word;
+      }
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+      .log-info {
+        color: #17a2b8;
+      }
+      .log-success {
+        color: #28a745;
+      }
+      .log-error {
+        color: #dc3545;
+      }
+      .log-warning {
+        color: #ffc107;
+      }
+      .log-send {
+        color: #6f42c1;
+      }
+      .log-receive {
+        color: #20c997;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📝 日志格式测试</h1>
+      <p>测试优化后的日志格式显示效果</p>
+
+      <div>
+        <button onclick="testInfo()">测试信息日志</button>
+        <button onclick="testSuccess()">测试成功日志</button>
+        <button onclick="testError()">测试错误日志</button>
+        <button onclick="testWarning()">测试警告日志</button>
+        <button onclick="testSend()">测试发送日志</button>
+        <button onclick="testReceive()">测试接收日志</button>
+        <button onclick="clearLog()">清空日志</button>
+      </div>
+
+      <div id="log" class="log"></div>
+    </div>
+
+    <script>
+      function log(message, type = "info") {
+        const logElement = document.getElementById("log");
+        const timestamp = new Date().toLocaleTimeString();
+        const typeIcon = {
+          info: "ℹ️",
+          success: "✅",
+          error: "❌",
+          warning: "⚠️",
+          send: "📤",
+          receive: "📨",
+        };
+
+        const icon = typeIcon[type] || "ℹ️";
+        logElement.innerHTML += `<div class="log-entry log-${type}">[${timestamp}] ${icon} ${message}</div>`;
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+
+      function testInfo() {
+        log("这是一条信息日志，用于显示一般信息", "info");
+      }
+
+      function testSuccess() {
+        log("操作成功完成！", "success");
+      }
+
+      function testError() {
+        log("发生了一个错误，请检查配置", "error");
+      }
+
+      function testWarning() {
+        log("警告：请注意这个重要信息", "warning");
+      }
+
+      function testSend() {
+        log("已发送请求: calculator", "send");
+      }
+
+      function testReceive() {
+        log("收到响应: 计算结果为 42", "receive");
+      }
+
+      function clearLog() {
+        document.getElementById("log").innerHTML = "";
+      }
+
+      // 页面加载时显示欢迎信息
+      window.onload = function () {
+        log("页面已加载，点击按钮测试不同日志类型", "info");
+      };
+    </script>
+  </body>
+</html>
